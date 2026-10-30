@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShrinkVid — Compress Videos in Your Browser</title>
+<meta name="description" content="ShrinkVid compresses videos to a target size entirely in your browser with FFmpeg.wasm: pick a size preset, a resolution and a quality setting, and download an MP4. Nothing is uploaded.">
+<link rel="canonical" href="https://shrinkvid-app.vercel.app">
+<meta property="og:title" content="ShrinkVid — Compress Videos in Your Browser">
+<meta property="og:description" content="Compress videos to a target size entirely in your browser. Nothing is uploaded.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://shrinkvid-app.vercel.app">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ShrinkVid — Compress Videos in Your Browser">
+<meta name="twitter:description" content="Compress videos to a target size entirely in your browser. Nothing is uploaded.">
+<meta name="theme-color" content="#0B0B0F">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">S</span><span class="brand-name">ShrinkVid</span></div>
+  <p class="tagline">Compress videos to a size that actually sends — entirely in your browser. No uploads, no accounts, no install.</p>
+</header>
+
+<main class="layout">
+  <section class="panel" aria-label="Your videos">
+    <h2>1. Your videos</h2>
+    <div class="dropzone" id="dropZone" role="button" tabindex="0" aria-label="Choose video files">
+      <p class="drop-title">Drop videos here, or click to choose files</p>
+      <p class="muted">MP4 and WebM work best. You can also paste a copied video file into the page. Up to 3 videos at a time.</p>
+      <input type="file" id="fileInput" accept="video/*" multiple hidden>
+    </div>
+    <p class="muted" id="queueNote">No videos yet. Your videos never leave this device.</p>
+    <p class="muted" id="queueCountText">Queue is empty. Add up to 3 videos.</p>
+    <ul class="queue" id="queueList"></ul>
+    <div class="row">
+      <button type="button" class="btn secondary" id="clearQueueBtn" disabled>Clear queue</button>
+    </div>
+    <p class="selected" id="videoNameText"></p>
+    <p class="muted" id="videoMetaText"></p>
+    <p class="muted" id="originalSizeText"></p>
+    <video id="previewPlayer" controls playsinline preload="metadata"></video>
+    <p class="muted">Keyboard: C compresses, Esc cancels. Shortcuts do nothing while you are typing in a field.</p>
+  </section>
+
+  <section class="panel" aria-label="Compression settings and result">
+    <h2>2. Compression settings</h2>
+    <label class="field">Target size
+      <select id="presetSelect"></select>
+    </label>
+    <label class="field">Custom target size in MB (only when Custom is chosen)
+      <input type="number" id="customSizeInput" min="1" max="1024" step="1" value="10" disabled>
+    </label>
+    <label class="field">Resolution
+      <select id="resolutionSelect"></select>
+    </label>
+    <p class="muted">Original keeps the source size. Lower resolutions shrink the file much faster than any other setting.</p>
+    <label class="field">Quality / speed
+      <select id="qualitySelect"></select>
+    </label>
+    <label class="field">Audio bitrate
+      <select id="audioSelect">
+        <option value="96">96 kbps</option>
+        <option value="128" selected>128 kbps</option>
+        <option value="192">192 kbps</option>
+        <option value="0">None (silent output)</option>
+      </select>
+    </label>
+    <p class="selected" id="planText">Load a video to see the compression plan.</p>
+    <p class="warning" id="planWarningText" hidden></p>
+
+    <h2>3. Compress</h2>
+    <p class="muted" id="encoderStatusText">Encoder not loaded yet — first run downloads the FFmpeg core (about 30 MB).</p>
+    <div class="row">
+      <button type="button" class="btn secondary" id="loadEncoderBtn">Load encoder</button>
+      <button type="button" class="btn" id="compressBtn" disabled>Compress</button>
+      <button type="button" class="btn secondary" id="cancelBtn" hidden>Cancel</button>
+    </div>
+    <p class="status" id="statusText">Add a video to get started.</p>
+    <div class="progress" id="progressWrap" hidden>
+      <div class="progress-bar" id="progressBar"></div>
+      <p class="muted" id="progressText"></p>
+    </div>
+
+    <div id="resultWrap" hidden>
+      <h2>Your compressed video</h2>
+      <video id="resultPlayer" controls playsinline preload="metadata"></video>
+      <p class="muted" id="resultMetaText"></p>
+      <p class="muted" id="compareText"></p>
+      <p class="warning" id="resultWarningText" hidden></p>
+      <div class="row">
+        <a class="btn" id="downloadBtn" href="#" download="video-compressed.mp4">Download compressed video</a>
+      </div>
+      <h2>All results in this run</h2>
+      <ul class="results" id="resultsList"></ul>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="How it works and honest notes">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li>Add up to 3 videos from your device. They are never uploaded anywhere.</li>
+      <li>Pick a target size: 16 MB for WhatsApp, 25 MB, 64 MB, or your own number.</li>
+      <li>Pick a resolution and a quality setting. The page shows the planned video bitrate before you compress anything.</li>
+      <li>Press Compress. The encoder runs in your browser, one video at a time, and each finished video gets its own download.</li>
+    </ol>
+
+    <h2>Honest notes</h2>
+    <p><strong>First run downloads the encoder.</strong> FFmpeg.wasm is about 30 MB, fetched from a pinned CDN release on first use and cached by the browser after that. With no connection, compression is unavailable and the page says so — there is no server to fall back to, because the whole point is that nothing uploads.</p>
+    <p><strong>Speed depends on your device.</strong> Compression runs on one browser thread (the multi-thread core needs special server headers this static site cannot set). A short phone clip finishes in seconds; a long 4K video can take many minutes and use a lot of memory. Keep the tab open while it runs.</p>
+    <p><strong>The output is MP4 (H.264 + AAC).</strong> MP4 was chosen because WhatsApp, phones and browsers all play it. A WebM/VP9 output would sometimes be smaller but encodes far slower in the browser and plays in fewer places.</p>
+    <p><strong>Target size is a target, not a promise.</strong> The encoder aims at the bitrate the target implies, but busy scenes and already-compressed sources vary. A finished file can land above or below the target, and the result panel reports the honest numbers — including when the result is larger than the original.</p>
+    <p><strong>Very large files can run out of memory.</strong> The whole video is held in browser memory during encoding. If a multi-gigabyte file fails, split it into shorter clips first, or lower the resolution.</p>
+    <p><strong>Codec support varies by browser.</strong> MP4 and WebM cover nearly everything, but whether a particular video decodes depends on your browser's codecs, not on ShrinkVid. If a file loads but shows no picture, try another browser or re-export it as MP4.</p>
+    <p class="muted">Output filenames keep your original name with "-compressed" added, so the original is never overwritten.</p>
+  </section>
+</main>
+<footer class="footer">
+  <p>Built by krrish · <a href="https://github.com/codewithkrrish/shrinkvid">GitHub</a> · <a href="https://www.instagram.com/krrishx.ai">Instagram</a></p>
+  <p>Your videos are processed locally in your browser and never uploaded.</p>
+</footer>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
