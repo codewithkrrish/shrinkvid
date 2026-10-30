@@ -1,22 +1,36 @@
-/* FFmpeg.wasm loader — pinned CDN releases, honest failure only.
-   Nothing is imported at module top level: the CDN modules are
+/* FFmpeg.wasm loader — vendored ffmpeg package, pinned CDN util/core,
+   honest failure only.
+   Nothing is imported at module top level: the modules are
    fetched lazily inside loadFFmpeg(), so a page with no connection
    still renders, and a failed load is a message, never a hang.
    Single-thread core is used on purpose: Vercel static hosting
    cannot set the COOP/COEP headers the multi-thread core needs,
-   so core-mt would fail on the deployed site. */
+   so core-mt would fail on the deployed site.
+   Why the ffmpeg package is vendored: FFmpeg.load() builds its
+   worker from a URL relative to import.meta.url
+   (new Worker(new URL("./worker.js", import.meta.url))). When the
+   package came from a CDN, that worker script was cross-origin
+   and browsers refused to construct it, so Compress failed even
+   though the page and settings worked. Vendored under
+   vendor/ffmpeg-esm/, the worker is same-origin and loads. Only
+   the ffmpeg package is vendored — it creates no other network
+   load of its own. @ffmpeg/util still comes from the pinned CDN
+   (it creates no worker) and core/wasm still load from the CDN
+   via toBlobURL, with the CDN fallback chain below for util/core. */
 
 export const FFMPEG_VERSION = '0.12.15';
 export const UTIL_VERSION = '0.12.2';
 export const UTIL_FALLBACK_VERSION = '0.12.1';
 export const CORE_VERSION = '0.12.6';
 
-export const FFMPEG_ESM_URL = `https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@${FFMPEG_VERSION}/+esm`;
+/* Relative to this file (js/ffmpeg.js): vendor/ffmpeg-esm/index.js
+   re-exports FFmpeg from the vendored classes.js, whose worker
+   resolves to the same-origin vendor/ffmpeg-esm/worker.js. */
+export const FFMPEG_LOCAL_URL = '../vendor/ffmpeg-esm/index.js';
 export const UTIL_ESM_URL = `https://cdn.jsdelivr.net/npm/@ffmpeg/util@${UTIL_VERSION}/+esm`;
 export const UTIL_FALLBACK_ESM_URL = `https://cdn.jsdelivr.net/npm/@ffmpeg/util@${UTIL_FALLBACK_VERSION}/+esm`;
 export const CORE_BASE_URL = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
 export const CORE_BASE_URL_UNPKG = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
-export const FFMPEG_UNPKG_URL = `https://unpkg.com/@ffmpeg/ffmpeg@${FFMPEG_VERSION}/esm/index.js`;
 export const UTIL_UNPKG_URL = `https://unpkg.com/@ffmpeg/util@${UTIL_VERSION}/esm/index.js`;
 
 const LOAD_TIMEOUT_MS = 120000;
@@ -53,9 +67,9 @@ let cached = null;
 export async function loadFFmpeg(onProgress) {
   if (cached) return cached;
   const candidates = [
-    { label: 'jsDelivr ffmpeg + util', ffmpegUrl: FFMPEG_ESM_URL, utilUrl: UTIL_ESM_URL, coreBase: CORE_BASE_URL },
-    { label: 'jsDelivr ffmpeg + util fallback', ffmpegUrl: FFMPEG_ESM_URL, utilUrl: UTIL_FALLBACK_ESM_URL, coreBase: CORE_BASE_URL },
-    { label: 'unpkg ffmpeg + util', ffmpegUrl: FFMPEG_UNPKG_URL, utilUrl: UTIL_UNPKG_URL, coreBase: CORE_BASE_URL_UNPKG },
+    { label: 'vendored ffmpeg + jsDelivr util', ffmpegUrl: FFMPEG_LOCAL_URL, utilUrl: UTIL_ESM_URL, coreBase: CORE_BASE_URL },
+    { label: 'vendored ffmpeg + jsDelivr util fallback', ffmpegUrl: FFMPEG_LOCAL_URL, utilUrl: UTIL_FALLBACK_ESM_URL, coreBase: CORE_BASE_URL },
+    { label: 'vendored ffmpeg + unpkg util', ffmpegUrl: FFMPEG_LOCAL_URL, utilUrl: UTIL_UNPKG_URL, coreBase: CORE_BASE_URL_UNPKG },
   ];
   const errors = [];
   for (const candidate of candidates) {
@@ -68,7 +82,7 @@ export async function loadFFmpeg(onProgress) {
   }
   cached = null;
   throw new Error(
-    `FFmpeg encoder could not be loaded from the pinned CDN releases (@ffmpeg/ffmpeg ${FFMPEG_VERSION}, @ffmpeg/util ${UTIL_VERSION}, @ffmpeg/core ${CORE_VERSION}). ` +
+    `FFmpeg encoder could not be loaded from the vendored ffmpeg package and the pinned CDN releases (@ffmpeg/ffmpeg ${FFMPEG_VERSION}, @ffmpeg/util ${UTIL_VERSION}, @ffmpeg/core ${CORE_VERSION}). ` +
     `Check your connection and try "Load encoder" again. (${errors.join(' | ')})`,
   );
 }

@@ -38,8 +38,12 @@ the browser do the encoding itself. Nothing leaves your device.
 
 ## How the encoding works
 
-FFmpeg.wasm 0.12.15 (pinned, from jsDelivr) with @ffmpeg/util
+FFmpeg.wasm 0.12.15 with @ffmpeg/util
 0.12.2 and @ffmpeg/core 0.12.6, single-thread core. The
+@ffmpeg/ffmpeg 0.12.15 ESM files (MIT) are vendored in
+vendor/ffmpeg-esm/ rather than loaded from a CDN, because browsers
+refuse a cross-origin worker script and the encoder's worker must
+be same-origin. The
 single-thread core is deliberate: the multi-thread core needs
 cross-origin isolation headers that a static host cannot set, so
 it would fail on the deployed site. If the CDN modules cannot
